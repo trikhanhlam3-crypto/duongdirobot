@@ -22,7 +22,7 @@ Python phiên bản 3.10 trở lên là bắt buộc để chạy ứng dụng. 
 
 ## Hướng Dẫn Sử Dụng
 
-Điều hướng vào thư mục robot bằng lệnh cd robot. Chạy ứng dụng bằng lệnh python app.py. Mở trình duyệt web và truy cập địa chỉ http://127.0.0.1:5050. Trên bản đồ, nhấp chuột để thêm các điểm giao hàng. Điểm đầu tiên sẽ được đánh dấu là kho P0 với màu đỏ, các điểm khác có màu xanh. Sau khi chọn ít nhất 3 điểm, nhấn nút Chạy Genetic Algorithm để tính toán lộ trình tối ưu. Kết quả sẽ hiển thị số lượng điểm, tổng khoảng cách, thứ tự giao hàng, và khoảng cách từng đoạn. Đường giao hàng tối ưu sẽ được vẽ trên bản đồ với các màu khác nhau cho từng đoạn đường. Để bắt đầu lại, nhấn nút Xóa tất cả điểm.
+Điều hướng vào thư mục robot bằng lệnh cd robot. Chạy ứng dụng bằng lệnh python app.py. Mở trình duyệt web và truy cập địa chỉ [Ấn Vào Đây nè](https://duongdirobot.onrender.com/). Trên bản đồ, nhấp chuột để thêm các điểm giao hàng. Điểm đầu tiên sẽ được đánh dấu là kho P0 với màu đỏ, các điểm khác có màu xanh. Sau khi chọn ít nhất 3 điểm, nhấn nút Chạy Genetic Algorithm để tính toán lộ trình tối ưu. Kết quả sẽ hiển thị số lượng điểm, tổng khoảng cách, thứ tự giao hàng, và khoảng cách từng đoạn. Đường giao hàng tối ưu sẽ được vẽ trên bản đồ với các màu khác nhau cho từng đoạn đường. Để bắt đầu lại, nhấn nút Xóa tất cả điểm.
 
 ## Cấu Trúc Dự Án
 
