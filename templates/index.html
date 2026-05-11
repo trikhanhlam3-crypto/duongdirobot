@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>GA Robot - Đường Thực Tế</title>
+
+<link
+rel="stylesheet"
+href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+/>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+
+body{
+    font-family:Arial;
+    margin:10px;
+    background:#f0f2f5;
+}
+
+#map{
+    height:700px;
+    width:100%;
+    border:2px solid #1976d2;
+    border-radius:8px;
+}
+
+button{
+    padding:12px 20px;
+    margin:5px;
+    font-size:16px;
+    border-radius:6px;
+    cursor:pointer;
+    border:none;
+}
+
+.btn-run{
+    background:#4caf50;
+    color:white;
+}
+
+.btn-run:disabled{
+    background:#aaa;
+    cursor:not-allowed;
+}
+
+#loading{
+    display:none;
+    color:#e65100;
+    font-weight:bold;
+    margin:6px 0;
+}
+
+#result{
+    color:#1565c0;
+    font-weight:bold;
+    margin:6px 0;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>
+🚀 GA Robot - Tìm Đường Thực Tế
+</h1>
+
+<p>
+<strong>
+Click vào bản đồ để chọn điểm
+(P0 = Kho)
+</strong>
+</p>
+
+<button
+class="btn-run"
+id="btn-run"
+onclick="runGA()"
+>
+🚀 Chạy Genetic Algorithm
+</button>
+
+<button onclick="clearAll()">
+🗑️ Xóa tất cả
+</button>
+
+<p>
+<strong>Điểm đã chọn:</strong>
+<span id="status">
+0 điểm
+</span>
+</p>
+
+<div id="loading">
+⏳
+<span id="loading-msg">
+Đang xử lý...
+</span>
+</div>
+
+<div id="result"></div>
+
+<div id="map"></div>
+
+<script>
+
+// =============================
+// MAP
+// =============================
+
+let map =
+L.map('map')
+.setView(
+    [10.95,106.8],
+    11
+);
+
+L.tileLayer(
+'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+{
+    attribution:
+    '© OpenStreetMap'
+}
+).addTo(map);
+
+let points = [];
+let markers = [];
+let currentPolylines = [];
+
+
+// =============================
+// CLICK ADD POINT
+// =============================
+
+map.on(
+'click',
+function(e){
+
+    const idx =
+    points.length;
+
+    points.push([
+        e.latlng.lat,
+        e.latlng.lng
+    ]);
+
+    let icon;
+
+    // Kho P0 màu đỏ
+    if(idx === 0){
+
+        icon =
+        new L.Icon({
+
+            iconUrl:
+            'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+
+            shadowUrl:
+            'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+
+            iconSize:
+            [25,41],
+
+            iconAnchor:
+            [12,41]
+        });
+
+    }else{
+
+        icon =
+        new L.Icon.Default();
+    }
+
+    const marker =
+    L.marker(
+        e.latlng,
+        { icon }
+    )
+    .addTo(map)
+    .bindTooltip(
+
+        idx === 0
+        ? '🏠 Kho (P0)'
+        : `P${idx}`,
+
+        {
+            permanent:true
+        }
+    );
+
+    markers.push(marker);
+
+    document
+    .getElementById(
+        'status'
+    )
+    .textContent =
+    `${points.length} điểm`;
+
+    document
+    .getElementById(
+        'result'
+    )
+    .innerHTML = '';
+});
+
+
+// =============================
+// GET REAL ROUTE
+// =============================
+
+async function getRealRoute(
+    p1,
+    p2
+){
+
+    try{
+
+        const url =
+
+        `https://router.project-osrm.org/route/v1/driving/`
+
+        +
+
+        `${p1[1]},${p1[0]};${p2[1]},${p2[0]}`
+
+        +
+
+        `?overview=full&geometries=geojson`;
+
+        const res =
+        await fetch(url);
+
+        const data =
+        await res.json();
+
+        if(
+            data.routes &&
+            data.routes[0]
+        ){
+
+            return {
+
+                distance:
+                data.routes[0]
+                .distance,
+
+                geometry:
+                data.routes[0]
+                .geometry
+            };
+        }
+
+    }catch(e){
+
+        console.log(
+            'OSRM ERROR',
+            e
+        );
+    }
+
+    return null;
+}
+
+
+// =============================
+// RUN GA
+// =============================
+
+async function runGA(){
+
+    if(
+        points.length < 3
+    ){
+
+        alert(
+        'Cần ít nhất 3 điểm!'
+        );
+
+        return;
+    }
+
+    const btn =
+    document
+    .getElementById(
+        'btn-run'
+    );
+
+    const loading =
+    document
+    .getElementById(
+        'loading'
+    );
+
+    const loadingMsg =
+    document
+    .getElementById(
+        'loading-msg'
+    );
+
+    const result =
+    document
+    .getElementById(
+        'result'
+    );
+
+    btn.disabled = true;
+
+    loading.style.display =
+    'block';
+
+    result.innerHTML = '';
+
+    // xóa route cũ
+    currentPolylines.forEach(
+        p => p.remove()
+    );
+
+    currentPolylines = [];
+
+    try{
+
+        loadingMsg.textContent =
+        'Đang tối ưu...';
+
+        const res =
+        await fetch(
+        '/optimize',
+        {
+            method:'POST',
+
+            headers:{
+                'Content-Type':
+                'application/json'
+            },
+
+            body:
+            JSON.stringify({
+                points
+            })
+        });
+
+        const data =
+        await res.json();
+
+        if(data.error){
+
+            throw new Error(
+                data.error
+            );
+        }
+
+        loadingMsg.textContent =
+        'Đang vẽ đường...';
+
+        await drawRealRoads(
+            data.best_route
+        );
+
+        const distKm =
+        (
+            data.best_distance
+            /1000
+        ).toFixed(2);
+
+        const routeStr =
+
+        data.best_route
+        .map(i => `P${i}`)
+        .join(' → ')
+
+        +
+
+        ` → P${data.best_route[0]}`;
+
+        result.innerHTML =
+
+        `✅ Hoàn thành!<br><br>
+
+        📏 Tổng khoảng cách:
+        <strong>
+        ${distKm} km
+        </strong><br><br>
+
+        🗺️ Route:
+        ${routeStr}`;
+
+    }catch(err){
+
+        result.innerHTML =
+        `❌ Lỗi:
+        ${err.message}`;
+    }
+
+    finally{
+
+        btn.disabled =
+        false;
+
+        loading.style.display =
+        'none';
+    }
+}
+
+
+// =============================
+// DRAW ROAD
+// =============================
+
+async function drawRealRoads(
+    route
+){
+
+    const colors = [
+
+        '#2196F3',
+        '#E91E63',
+        '#FF9800',
+        '#4CAF50',
+        '#9C27B0'
+    ];
+
+    for(
+        let i = 0;
+        i < route.length;
+        i++
+    ){
+
+        const from =
+        points[
+            route[i]
+        ];
+
+        const to =
+        points[
+            route[
+            (i+1)
+            %
+            route.length
+            ]
+        ];
+
+        const color =
+        colors[
+            i %
+            colors.length
+        ];
+
+        const routeData =
+        await getRealRoute(
+            from,
+            to
+        );
+
+        if(
+            routeData &&
+            routeData.geometry
+        ){
+
+            const coords =
+
+            routeData
+            .geometry
+            .coordinates
+
+            .map(
+                c => [
+                    c[1],
+                    c[0]
+                ]
+            );
+
+            const poly =
+            L.polyline(
+                coords,
+                {
+                    color,
+                    weight:6,
+                    opacity:0.85
+                }
+            )
+            .addTo(map);
+
+            currentPolylines
+            .push(poly);
+
+        }else{
+
+            const poly =
+            L.polyline(
+                [from,to],
+                {
+                    color:'red',
+                    dashArray:'8,6'
+                }
+            )
+            .addTo(map);
+
+            currentPolylines
+            .push(poly);
+        }
+    }
+
+    if(
+        currentPolylines.length
+        > 0
+    ){
+
+        const group =
+
+        L.featureGroup(
+            currentPolylines
+        );
+
+        map.fitBounds(
+            group
+            .getBounds()
+            .pad(0.1)
+        );
+    }
+}
+
+
+// =============================
+// CLEAR
+// =============================
+
+function clearAll(){
+
+    points = [];
+
+    markers.forEach(
+        m => m.remove()
+    );
+
+    currentPolylines
+    .forEach(
+        p => p.remove()
+    );
+
+    markers = [];
+    currentPolylines = [];
+
+    document
+    .getElementById(
+        'status'
+    )
+    .textContent =
+    '0 điểm';
+
+    document
+    .getElementById(
+        'result'
+    )
+    .innerHTML = '';
+}
+
+</script>
+
+</body>
+</html>
